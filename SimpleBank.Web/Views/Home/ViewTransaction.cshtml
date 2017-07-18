@@ -1,0 +1,65 @@
+@model IEnumerable<SimpleBank.DataService.Entity.Transaction>
+
+@{
+    ViewData["Title"] = "ViewTransaction";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+}
+
+<h2>ViewTransaction</h2>
+
+<table class="table">
+    <thead>
+        <tr>
+                <th>
+                    @Html.DisplayNameFor(model => model.CreatedDate)
+                </th>
+                <th>
+                    @Html.DisplayNameFor(model => model.Amount)
+                </th>
+                <th>
+                    From account number
+                </th>
+                <th>
+                    From account name
+                </th>
+                <th>
+                    To account number
+                </th>
+                
+                <th>
+                    To account name
+                </th>
+                <th>
+                    @Html.DisplayNameFor(model => model.Type)
+                </th>
+            <th></th>
+        </tr>
+    </thead>
+    <tbody>
+@foreach (var item in Model) {
+        <tr>
+            <td>
+                @Html.DisplayFor(modelItem => item.CreatedDate)
+            </td>
+            <td>
+                @Html.DisplayFor(modelItem => item.Amount)
+            </td>
+            <td>
+                @Html.DisplayFor(modelItem => item.FromAccount.Number)
+            </td>
+            <td>
+                @Html.DisplayFor(modelItem => item.FromAccount.FullName)
+            </td>
+            <td>
+                @Html.DisplayFor(modelItem => item.ToAccount.Number)
+            </td>
+            <td>
+                @Html.DisplayFor(modelItem => item.ToAccount.FullName)
+            </td>
+            <td>
+                @Html.DisplayFor(modelItem => item.Type)
+            </td>            
+        </tr>
+}
+    </tbody>
+</table>

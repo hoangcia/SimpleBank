@@ -1,0 +1,52 @@
+@model SimpleBank.DataService.Entity.Account
+
+@{
+    ViewData["Title"] = "Index";
+}
+
+<h2>Index</h2>
+
+<ul class="list-inline">
+    <li><p><a href="/Account/Edit">Edit profile </a> </p></li>
+    <li><p><a href="/Account/Deposit">Deposit </a> </p></li>
+    <li><p><a href="/Account/Withdraw">Withdraw </a> </p></li>
+    <li><p><a href="/Account/Transfer">Transfer </a> </p></li>
+
+    <li><p><a href="/Account/SignOut">Sign out </a> </p></li>
+</ul>
+<table class="table">
+    <tbody>
+        <tr>
+            <th>
+                @Html.DisplayNameFor(model => model.Number)
+            </th>
+            <td>
+                @Html.DisplayFor(model => model.Number)
+            </td>
+        </tr>
+        <tr>
+            <th>
+                @Html.DisplayNameFor(model => model.Email)
+            </th>
+            <td>
+                @Html.DisplayFor(model => model.Email)
+            </td>
+        </tr>
+        <tr>
+            <th>
+                @Html.DisplayNameFor(model => model.FullName)
+            </th>
+            <td>
+                @Html.DisplayFor(model => model.FullName)
+            </td>
+        </tr>
+        <tr>
+            <th>
+                @Html.DisplayNameFor(model => model.Balance)
+            </th>
+            <td>
+                @Html.DisplayFor(model => model.Balance)
+            </td>
+        </tr>                
+    </tbody>
+</table>
