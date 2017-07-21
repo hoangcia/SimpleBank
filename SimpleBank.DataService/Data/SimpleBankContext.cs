@@ -20,19 +20,18 @@ namespace SimpleBank.DataService.Data
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
-            
+            modelBuilder.Entity<Account>().ToTable("Account");
             modelBuilder.Entity<Account>()
                 .Property(p => p.RowVersion)
                 .IsConcurrencyToken()
                 .ValueGeneratedOnAddOrUpdate();
-            modelBuilder.Entity<Account>().ToTable("Account");
+            
 
             modelBuilder.Entity<Account>().HasIndex(p => p.Email).IsUnique();
             modelBuilder.Entity<Account>().HasIndex(p => p.Number).IsUnique();
             
             modelBuilder.Entity<Transaction>().ToTable("Transaction");
-
-            base.OnModelCreating(modelBuilder);
+            
         }        
     }
 

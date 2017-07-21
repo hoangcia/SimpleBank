@@ -9,9 +9,10 @@ using SimpleBank.DataService.Entity;
 namespace SimpleBank.DataService.Migrations
 {
     [DbContext(typeof(SimpleBankContext))]
-    partial class SimpleBankContextModelSnapshot : ModelSnapshot
+    [Migration("20170720192517_TransactionsAddStatusColumn")]
+    partial class TransactionsAddStatusColumn
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
             modelBuilder
                 .HasAnnotation("ProductVersion", "1.1.2")

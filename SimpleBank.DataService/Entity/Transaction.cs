@@ -15,6 +15,7 @@ namespace SimpleBank.DataService.Entity
         public DateTime CreatedDate { get; set; }
         public decimal Amount { get; set; }
         public TransactionType Type {get; set;}
+        public TransactionStatus Status { get; set; }
 
     }
 
@@ -24,5 +25,10 @@ namespace SimpleBank.DataService.Entity
         Deposit,
         Withdraw,
         Transfer
+    }
+    public enum TransactionStatus
+    {
+        Processing = 1,
+        Success
     }
 }

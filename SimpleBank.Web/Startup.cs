@@ -9,7 +9,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using SimpleBank.DataService.Data;
 using Microsoft.EntityFrameworkCore;
-
+using SimpleBank.DataService.Services;
 namespace SimpleBank.Web
 {
     public class Startup
@@ -29,6 +29,9 @@ namespace SimpleBank.Web
         // This method gets called by the runtime. Use this method to add services to the container.
         public void ConfigureServices(IServiceCollection services)
         {
+            // register IService
+            services.AddScoped<IAccountService, AccountService>();            
+
             // Add framework services.
             services.AddDbContext<SimpleBankContext>(options =>
                 options.UseSqlServer(Configuration.GetConnectionString("DefaultConnection")));

@@ -11,16 +11,18 @@ using Microsoft.AspNetCore.Http;
 using System.Security.Cryptography;
 using System.Text;
 using SimpleBank.Web.Utils;
+using SimpleBank.DataService.Services;
+using SimpleBank.DataService.Dto;
 
 namespace SimpleBank.Web.Controllers
 {
     public class AccountController : Controller
     {
-        private readonly SimpleBankContext _context;        
+        private readonly IAccountService _accountService;
 
-        public AccountController(SimpleBankContext context)
+        public AccountController(IAccountService accountService)
         {
-            _context = context;    
+            _accountService = accountService;
         }
 
         // GET: Account
@@ -31,7 +33,7 @@ namespace SimpleBank.Web.Controllers
             
             var signedInUserEmail = HttpContext.Session.GetString("SignedInUserEmail");
             if (string.IsNullOrEmpty(signedInUserEmail)) return Redirect("/Home/Index");
-            var signedInAcc = await _context.Accounts.SingleOrDefaultAsync<Account>(acc => acc.Email.ToLower() == signedInUserEmail.ToLower());
+            var signedInAcc = await _accountService.GetAccountByEmail(signedInUserEmail);
             return View(signedInAcc);
         }
 
@@ -43,8 +45,8 @@ namespace SimpleBank.Web.Controllers
                 return NotFound();
             }
 
-            var account = await _context.Accounts
-                .SingleOrDefaultAsync(m => m.ID == id);
+            var account = await _accountService.GetAccount(id.Value);
+                
             if (account == null)
             {
                 return NotFound();
@@ -58,9 +60,7 @@ namespace SimpleBank.Web.Controllers
         {            
             string signedInUserEmail = HttpContext.Session.GetString("SignedInUserEmail");
 
-            var account = await _context.Accounts
-                .AsNoTracking()
-                .SingleOrDefaultAsync(m => m.Email.ToLower() == signedInUserEmail.ToLower());
+            var account = await _accountService.GetAccountByEmail(signedInUserEmail);
             if (account == null)
             {
                 return NotFound();
@@ -80,66 +80,33 @@ namespace SimpleBank.Web.Controllers
             string signedInUserEmail = HttpContext.Session.GetString("SignedInUserEmail");
 
 
-            var accountToUpdate = await _context.Accounts
-                .SingleOrDefaultAsync(m => m.Email.ToLower() == signedInUserEmail.ToLower());
+            var accountToUpdate = new Account { ID = id.Value, RowVersion = rowVersion };
+            await TryUpdateModelAsync(accountToUpdate);
 
+            AccountDto accDto = await _accountService.UpdateAccount(accountToUpdate);
 
-            if (accountToUpdate == null )
+            foreach(var e in accDto.Errors)
             {
-                if(accountToUpdate.ID != id) 
-                    return NotFound();
-                                
-                ModelState.AddModelError(string.Empty, "Could not save changes. The account was not found.");
-                return View();
+                ModelState.AddModelError(string.Empty, "The record you attempted to edit "
+                        + "was modified by another user after you got the original value. The "
+                        + "edit operation was canceled and the current values in the database "
+                        + "have been displayed. If you still want to edit this record, click "
+                        + "the Save button again. Otherwise click the Back to Home hyperlink.");
+                ModelState.AddModelError(e.Key, e.Value);
+
             }
-
-            _context.Entry(accountToUpdate).Property("RowVersion").OriginalValue = rowVersion;            
-
-            if (await TryUpdateModelAsync<Account>(accountToUpdate, "", m => m.FullName, m => m.Address))
+            if (accDto.Errors.Any())
             {
-                try
-                {                    
-                    await _context.SaveChangesAsync();
-                    return RedirectToAction("Index");
-                }
-                catch (DbUpdateConcurrencyException ex)
-                {
-                    var exceptionEntry = ex.Entries.Single();
-                    var clientValues = (Account)exceptionEntry.Entity;
-                    var databaseEntry = exceptionEntry.GetDatabaseValues();
-                    if (databaseEntry == null)
-                    {
-                        ModelState.AddModelError(string.Empty, "Could not save changes. The account was deleted.");
-                    }
-                    else
-                    {
-                        var databaseValues = (Account)databaseEntry.ToObject();
-                        if(databaseValues.FullName != clientValues.FullName)
-                        {
-                            ModelState.AddModelError("FullName", $"Current value: {databaseValues.FullName}");
-                        }
-                        if (databaseValues.Address != clientValues.Address)
-                        {
-                            ModelState.AddModelError("Address", $"Current value: {databaseValues.Address}");
-                        }                        
-
-                        ModelState.AddModelError(string.Empty, @"The record you attemped to edit was modified by another transaction after you got the original value.");
-
-                        accountToUpdate.RowVersion = (byte[])databaseValues.RowVersion;
-                        ModelState.Remove("RowVersion");
-                    }
-
-                }
+                return View(accountToUpdate);
             }
-
-            return View("Edit", accountToUpdate);
+            return View("Index", accDto.Account);
         }
         [HttpPost]
-        public IActionResult SignIn(string username, string password)
+        public async Task<IActionResult> SignIn(string username, string password)
         {
 
             string hashedPassword = !string.IsNullOrEmpty(password)? Common.GenerateHashedPassword(password) : string.Empty;
-            Account acc = _context.Accounts.SingleOrDefault(account => account.Email == username && account.Password.ToLower() == hashedPassword.ToLower());
+            Account acc = await _accountService.GetAccount(username, hashedPassword);
             if (acc != null)
             {
                 HttpContext.Session.SetString("SignedInUserEmail", username.ToLower());
@@ -172,8 +139,8 @@ namespace SimpleBank.Web.Controllers
                 Number = number,
                 Password = hashedPassword
             };
-             _context.Accounts.Add(acc);
-            await _context.SaveChangesAsync();
+             AccountDto accDto = await _accountService.CreateAccount(acc);
+            
             HttpContext.Session.SetString("SignedInUserEmail", email.ToLower());
             return View("Index", acc);
         }
@@ -196,123 +163,63 @@ namespace SimpleBank.Web.Controllers
         public async Task<IActionResult> Deposit(Transaction transaction)
        {            
             string signedInUserEmail = HttpContext.Session.GetString("SignedInUserEmail");
-            Account signedInUser = _context.Accounts.SingleOrDefault(acc => acc.Email.ToLower() == signedInUserEmail.ToLower());
+            Account signedInUser = await _accountService.GetAccountByEmail(signedInUserEmail);
             transaction.Type = TransactionType.Deposit;
             transaction.CreatedDate = DateTime.Now;
             transaction.ToAccount = signedInUser;
 
-            string errMsg = ValidateDepositTransaction(transaction);
-            if (!string.IsNullOrEmpty(errMsg))
+            TransactionDto transDto = await _accountService.ExecuteTransaction(transaction);
+            foreach (var e in transDto.Errors)
             {
-                ViewBag.ErrMsg = errMsg;
-                return View("TransactionError");
+                ModelState.AddModelError(e.Key, e.Value);
             }
-
-            ExecuteTransaction(transaction);
-
-            _context.Transactions.Add(transaction);
-
-            await _context.SaveChangesAsync();
-
             return View("TransactionSuccess");
         }
         [HttpPost]
         public async Task<IActionResult> Withdraw(Transaction transaction)
-        {            
+        {
 
             string signedInUserEmail = HttpContext.Session.GetString("SignedInUserEmail");
-            Account signedInUser = _context.Accounts.SingleOrDefault(acc => acc.Email.ToLower() == signedInUserEmail.ToLower());
+            Account signedInUser = await _accountService.GetAccountByEmail(signedInUserEmail);
             transaction.Type = TransactionType.Withdraw;
             transaction.CreatedDate = DateTime.Now;
             transaction.FromAccount = signedInUser;
 
-            string errMsg = ValidateWithdrawTransaction(transaction);
-            if (!string.IsNullOrEmpty(errMsg))
+            TransactionDto transDto = await _accountService.ExecuteTransaction(transaction);
+            if (transDto.Errors.Any())
             {
-                ViewBag.ErrMsg = errMsg;
-                return View("TransactionError");
+                foreach (var e in transDto.Errors)
+                {
+                    ModelState.AddModelError(e.Key, e.Value);
+                }
+                return View();
             }
-
-            ExecuteTransaction(transaction);
-
-            _context.Transactions.Add(transaction);
-
-            await _context.SaveChangesAsync();
+            
             return View("TransactionSuccess");
         }
         [HttpPost]
         public async Task<IActionResult> Transfer(Transaction transaction)
         {            
             string signedInUserEmail = HttpContext.Session.GetString("SignedInUserEmail");
-            Account signedInUser = _context.Accounts.SingleOrDefault(acc => acc.Email.ToLower() == signedInUserEmail.ToLower());
-            Account toAccount = _context.Accounts.SingleOrDefault(acc => acc.Number == transaction.ToAccount.Number); 
+            Account signedInUser = await _accountService.GetAccountByEmail(signedInUserEmail);
+            Account toAccount = await _accountService.GetAccountByNumber(transaction.ToAccount.Number.Trim()); 
             transaction.Type = TransactionType.Transfer;
             transaction.CreatedDate = DateTime.Now;
             transaction.FromAccount = signedInUser;
             transaction.ToAccount = toAccount;
 
-            string errMsg = ValidateTransferTransaction(transaction);
-            if (!string.IsNullOrEmpty(errMsg))
-            {
-                ViewBag.ErrMsg = errMsg;
-                return View("TransactionError");
-            }
-
-            ExecuteTransaction(transaction);
-
-            _context.Transactions.Add(transaction);
-
-            await _context.SaveChangesAsync();
-            return View("TransactionSuccess");
-        }
-
-        public static string ValidateDepositTransaction(Transaction trans)
-        {
-            if (trans == null || trans.Amount <= 0) return "Invalid amount";
-            return string.Empty;
-        }
-        public static string ValidateTransferTransaction(Transaction trans)
-        {
-            var errMsg = string.Empty;
-
-            if (trans == null || trans.Amount <= 0 || trans.FromAccount.Balance < trans.Amount) errMsg = "Invalid amount";
-            if (trans.FromAccount == null || string.IsNullOrEmpty(trans.FromAccount.Number)) errMsg += " Invalid FromAccount";
-            if (trans.ToAccount == null || string.IsNullOrEmpty(trans.ToAccount.Number)) errMsg += " Invalid ToAccount";
-
-            return string.Empty;
-        }
-        public static string ValidateWithdrawTransaction(Transaction trans)
-        {
-            if (trans == null || trans.Amount <= 0 || trans.FromAccount.Balance < trans.Amount) return "Invalid amount";
-            return string.Empty;
-        }
-
-        public static bool ExecuteTransaction(Transaction trans)
-        {
-            try
-            {
-                switch (trans.Type)
-                {
-                    case TransactionType.Deposit:
-                        trans.ToAccount.Balance += trans.Amount;
-                        break;
-                    case TransactionType.Withdraw:
-                        trans.FromAccount.Balance -= trans.Amount;
-                        break;
-                    case TransactionType.Transfer:
-                        trans.FromAccount.Balance -= trans.Amount;
-                        trans.ToAccount.Balance += trans.Amount;
-                        break;
-                    default: return false;
-
-                }
-                return true;
-            }
-            catch(Exception ex)
-            {
-                return false;
-            }
             
-        }
+            TransactionDto transDto = await _accountService.ExecuteTransaction(transaction);
+
+            if (transDto.Errors.Any())
+            {
+                foreach (var e in transDto.Errors)
+                {
+                    ModelState.AddModelError(e.Key, e.Value);
+                }
+                return View();
+            }
+            return View("TransactionSuccess");
+        }        
     }
 }
