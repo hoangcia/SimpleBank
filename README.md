@@ -19,7 +19,7 @@ The **test** folder contains all unit test written by using XUnit
 ### How to run:
 
 1. Clone this project files to your local machine.
-2. Open Command Propmpt window, go to project folder then type `dotnet ef database update` to apply database migrations
+2. Open Command Propmpt window, go to project folder **SimpleWeb.DataService** then type `dotnet ef database update` to apply database migrations
 3. Open solution file **SimpleBank.sln** in Visual Studio 2017
 4. Press **Ctrl + Shift + B** to build the solution
 5. Press **Ctrl + F5** to run the application
